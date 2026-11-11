@@ -156,6 +156,40 @@ func TestBackupWaitsForTheResyncPbmStartedItself(t *testing.T) {
 	}
 }
 
+func TestRestoreWaitsForTheResyncAConfigChangeStarted(t *testing.T) {
+	running, restored := 0, false
+	engine := archivedEngine(t, func(_ context.Context, _ string, args ...string) (string, error) {
+		call := strings.Join(args, " ")
+		switch {
+		case args[0] == "logs":
+			return `[{"ts":` + strconv.FormatInt(time.Now().Unix(), 10) + `,"s":3,"msg":"succeed"}]`, nil
+		case args[0] == "status":
+			if running > 0 {
+				running--
+
+				return `{"running":{"type":"resync"}}`, nil
+			}
+
+			return `{"running":{}}`, nil
+		case strings.HasPrefix(call, "config --set"):
+			running = 2
+		case args[0] == "restore" || args[0] == "backup" || call == "config --force-resync":
+			if running > 0 {
+				return "", errors.New("another operation in progress, Resync storage")
+			}
+			restored = restored || args[0] == "restore"
+		}
+
+		return "", nil
+	})
+	sent := []bson.D{}
+	engine.member = fakeAdmin{sent: &sent}
+
+	if err := engine.Archive().Restore(context.Background(), requests.RestoreStart{Key: "r1", Target: time.Now().UTC()}, func(string) {}); err != nil || !restored {
+		t.Fatalf("restored = %v, err = %v", restored, err)
+	}
+}
+
 func TestResyncFailureStopsTheWait(t *testing.T) {
 	engine := archivedEngine(t, func(context.Context, string, ...string) (string, error) {
 		return `[{"ts":` + strconv.FormatInt(time.Now().Unix(), 10) + `,"s":1,"msg":"access denied"}]`, nil

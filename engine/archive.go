@@ -115,10 +115,7 @@ func (a archive) Backup(ctx context.Context) error {
 	if err := a.usePbmStorage(ctx, request.Archive.Storage); err != nil {
 		return err
 	}
-	if err := a.untilIdle(ctx); err != nil {
-		return err
-	}
-	if _, err := a.pbmCommand(ctx, "backup", "--compression=zstd", "--wait"); err != nil {
+	if _, err := a.locked(ctx, "backup", "--compression=zstd", "--wait"); err != nil {
 		return err
 	}
 	_, err = a.pbmCommand(ctx, "cleanup", "--older-than="+strconv.FormatInt(request.Archive.RetentionDays, 10)+"d", "--yes")
@@ -242,7 +239,7 @@ func (a archive) Restore(ctx context.Context, request requests.RestoreStart, rep
 		return err
 	}
 	report("restoring")
-	if _, err := a.pbmCommand(ctx, "restore", "--time="+request.Target.UTC().Format(restoreLayout), "--yes", "--wait"); err != nil {
+	if _, err := a.locked(ctx, "restore", "--time="+request.Target.UTC().Format(restoreLayout), "--yes", "--wait"); err != nil {
 		return err
 	}
 	if err := a.reclaimInternalUsers(ctx, saved.Secrets); err != nil {
@@ -255,7 +252,7 @@ func (a archive) Restore(ctx context.Context, request requests.RestoreStart, rep
 	if _, err := a.pbmCommand(ctx, "config", "--set", "pitr.enabled=true"); err != nil {
 		return err
 	}
-	_, err = a.pbmCommand(ctx, "backup", "--compression=zstd", "--wait")
+	_, err = a.locked(ctx, "backup", "--compression=zstd", "--wait")
 
 	return err
 }
@@ -264,11 +261,8 @@ func (a archive) syncStorage(ctx context.Context, storage dtos.Storage) error {
 	if err := a.usePbmStorage(ctx, storage); err != nil {
 		return err
 	}
-	if err := a.untilIdle(ctx); err != nil {
-		return err
-	}
 	started := time.Now().Unix()
-	if _, err := a.pbmCommand(ctx, "config", "--force-resync"); err != nil {
+	if _, err := a.locked(ctx, "config", "--force-resync"); err != nil {
 		return err
 	}
 
@@ -308,8 +302,12 @@ func (a archive) resynced(ctx context.Context, since int64) (bool, error) {
 	return a.idle(ctx), nil
 }
 
-func (a archive) untilIdle(ctx context.Context) error {
-	return family.Until(ctx, resyncTimeout, func() (bool, error) { return a.idle(ctx), nil })
+func (a archive) locked(ctx context.Context, args ...string) (string, error) {
+	if err := family.Until(ctx, resyncTimeout, func() (bool, error) { return a.idle(ctx), nil }); err != nil {
+		return "", err
+	}
+
+	return a.pbmCommand(ctx, args...)
 }
 
 func (a archive) idle(ctx context.Context) bool {
