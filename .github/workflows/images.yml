@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   images:
-    uses: databasifylabs/engine-sdk/.github/workflows/engine-images.yml@v0.2.0
+    uses: databasifylabs/engine-sdk/.github/workflows/engine-images.yml@398de5e1c8023525ca7b1990e2b39525017b2c4f
     with:
       engine: mongodb
       versions-file: versions.json
