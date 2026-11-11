@@ -261,6 +261,9 @@ func (a archive) syncStorage(ctx context.Context, storage dtos.Storage) error {
 	if err := a.usePbmStorage(ctx, storage); err != nil {
 		return err
 	}
+	if err := family.Until(ctx, resyncTimeout, func() (bool, error) { return a.idle(ctx), nil }); err != nil {
+		return err
+	}
 	started := time.Now().Unix()
 	if _, err := a.pbmCommand(ctx, "config", "--force-resync"); err != nil {
 		return err
@@ -299,10 +302,14 @@ func (a archive) resynced(ctx context.Context, since int64) (bool, error) {
 	if !succeeded {
 		return false, nil
 	}
-	raw, err = a.pbmCommand(ctx, "status", "--out=json")
+	return a.idle(ctx), nil
+}
+
+func (a archive) idle(ctx context.Context) bool {
+	raw, err := a.pbmCommand(ctx, "status", "--out=json")
 	var status pbmStatus
 
-	return err == nil && json.Unmarshal([]byte(raw), &status) == nil && status.Running.Type == "", nil
+	return err == nil && json.Unmarshal([]byte(raw), &status) == nil && status.Running.Type == ""
 }
 
 func (a archive) reclaimInternalUsers(ctx context.Context, secrets dtos.Secrets) error {

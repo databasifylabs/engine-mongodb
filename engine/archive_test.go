@@ -3,6 +3,7 @@ package mongodb
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"slices"
 	"strconv"
 	"strings"
@@ -90,6 +91,38 @@ func TestRestoreTurnsPitrOffThenOn(t *testing.T) {
 		if !strings.Contains(bson.Raw(reclaimed).String(), want) {
 			t.Errorf("restore did not put back %s: %s", want, bson.Raw(reclaimed).String())
 		}
+	}
+}
+
+func TestStorageSyncWaitsForTheResyncPbmStartedItself(t *testing.T) {
+	running := 0
+	engine := archivedEngine(t, func(_ context.Context, _ string, args ...string) (string, error) {
+		switch strings.Join(args, " ") {
+		case "config --force-resync":
+			if running > 0 {
+				return "", errors.New("another operation in progress, Resync storage")
+			}
+		case "status --out=json":
+			if running > 0 {
+				running--
+
+				return `{"running":{"type":"resync"}}`, nil
+			}
+
+			return `{"running":{}}`, nil
+		}
+		if args[0] == "logs" {
+			return `[{"ts":` + strconv.FormatInt(time.Now().Unix(), 10) + `,"s":3,"msg":"succeed"}]`, nil
+		}
+		if args[0] == "config" && args[1] == "--file" {
+			running = 2
+		}
+
+		return "", nil
+	})
+
+	if err := (archive{engine}).syncStorage(context.Background(), dtos.Storage{Bucket: "own"}); err != nil {
+		t.Fatal(err)
 	}
 }
 
