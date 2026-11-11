@@ -115,6 +115,9 @@ func (a archive) Backup(ctx context.Context) error {
 	if err := a.usePbmStorage(ctx, request.Archive.Storage); err != nil {
 		return err
 	}
+	if err := a.untilIdle(ctx); err != nil {
+		return err
+	}
 	if _, err := a.pbmCommand(ctx, "backup", "--compression=zstd", "--wait"); err != nil {
 		return err
 	}
@@ -261,7 +264,7 @@ func (a archive) syncStorage(ctx context.Context, storage dtos.Storage) error {
 	if err := a.usePbmStorage(ctx, storage); err != nil {
 		return err
 	}
-	if err := family.Until(ctx, resyncTimeout, func() (bool, error) { return a.idle(ctx), nil }); err != nil {
+	if err := a.untilIdle(ctx); err != nil {
 		return err
 	}
 	started := time.Now().Unix()
@@ -303,6 +306,10 @@ func (a archive) resynced(ctx context.Context, since int64) (bool, error) {
 		return false, nil
 	}
 	return a.idle(ctx), nil
+}
+
+func (a archive) untilIdle(ctx context.Context) error {
+	return family.Until(ctx, resyncTimeout, func() (bool, error) { return a.idle(ctx), nil })
 }
 
 func (a archive) idle(ctx context.Context) bool {

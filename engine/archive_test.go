@@ -126,6 +126,36 @@ func TestStorageSyncWaitsForTheResyncPbmStartedItself(t *testing.T) {
 	}
 }
 
+func TestBackupWaitsForTheResyncPbmStartedItself(t *testing.T) {
+	running, backedUp := 0, false
+	engine := archivedEngine(t, func(_ context.Context, _ string, args ...string) (string, error) {
+		switch args[0] {
+		case "config":
+			running = 2
+		case "status":
+			if running > 0 {
+				running--
+
+				return `{"running":{"type":"resync"}}`, nil
+			}
+
+			return `{"running":{}}`, nil
+		case "backup":
+			if running > 0 {
+				return "", errors.New("unable to proceed with the backup, active lock is present")
+			}
+			backedUp = true
+		}
+
+		return "", nil
+	})
+	engine.anonymous = fakeAdmin{replies: map[string]bson.M{"hello": {"isWritablePrimary": true}}}
+
+	if err := engine.Archive().Backup(context.Background()); err != nil || !backedUp {
+		t.Fatalf("backed up = %v, err = %v", backedUp, err)
+	}
+}
+
 func TestResyncFailureStopsTheWait(t *testing.T) {
 	engine := archivedEngine(t, func(context.Context, string, ...string) (string, error) {
 		return `[{"ts":` + strconv.FormatInt(time.Now().Unix(), 10) + `,"s":1,"msg":"access denied"}]`, nil
