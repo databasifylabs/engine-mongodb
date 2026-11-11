@@ -72,11 +72,11 @@ func TestRestoreTurnsPitrOffThenOn(t *testing.T) {
 
 	want := []string{
 		"config --file " + engine.root.Path(pbmConfig),
-		"config --force-resync",
+		"config --force-resync --wait",
 		"config --set pitr.enabled=false",
 		"restore --time=2026-11-09T10:30:00 --yes --wait",
 		"config --file " + engine.root.Path(pbmConfig),
-		"config --force-resync",
+		"config --force-resync --wait",
 		"config --set pitr.enabled=true",
 		"backup --compression=zstd --wait",
 	}
@@ -98,7 +98,7 @@ func TestStorageSyncWaitsForTheResyncPbmStartedItself(t *testing.T) {
 	running := 0
 	engine := archivedEngine(t, func(_ context.Context, _ string, args ...string) (string, error) {
 		switch strings.Join(args, " ") {
-		case "config --force-resync":
+		case "config --force-resync --wait":
 			if running > 0 {
 				return "", errors.New("another operation in progress, Resync storage")
 			}
@@ -173,7 +173,7 @@ func TestRestoreWaitsForTheResyncAConfigChangeStarted(t *testing.T) {
 			return `{"running":{}}`, nil
 		case strings.HasPrefix(call, "config --set"):
 			running = 2
-		case args[0] == "restore" || args[0] == "backup" || call == "config --force-resync":
+		case args[0] == "restore" || args[0] == "backup" || call == "config --force-resync --wait":
 			if running > 0 {
 				return "", errors.New("another operation in progress, Resync storage")
 			}
@@ -215,6 +215,45 @@ func TestBackupWaitsForARunningResyncBeforeWritingTheConfig(t *testing.T) {
 
 	if err := engine.Archive().Backup(context.Background()); err != nil || !configured {
 		t.Fatalf("configured = %v, err = %v", configured, err)
+	}
+}
+
+func TestLockingCommandRetriesWhileAnotherOperationStarts(t *testing.T) {
+	refusals, ran := 2, false
+	engine := archivedEngine(t, func(_ context.Context, _ string, args ...string) (string, error) {
+		switch args[0] {
+		case "status":
+			return `{"running":{}}`, nil
+		case "restore":
+			if refusals > 0 {
+				refusals--
+
+				return "", errors.New("Error: another operation in progress, Resync storage/abc")
+			}
+			ran = true
+		}
+
+		return "", nil
+	})
+
+	if _, err := engine.locked(context.Background(), "restore", "--time=x", "--yes", "--wait"); err != nil || !ran {
+		t.Fatalf("ran = %v, err = %v", ran, err)
+	}
+}
+
+func TestLockingCommandStopsOnOtherErrors(t *testing.T) {
+	calls := 0
+	engine := archivedEngine(t, func(_ context.Context, _ string, args ...string) (string, error) {
+		if args[0] == "status" {
+			return `{"running":{}}`, nil
+		}
+		calls++
+
+		return "", errors.New("access denied")
+	})
+
+	if _, err := engine.locked(context.Background(), "backup"); err == nil || calls != 1 {
+		t.Fatalf("calls = %d, err = %v", calls, err)
 	}
 }
 

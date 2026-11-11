@@ -27,6 +27,7 @@ const (
 	pbmConfig     = "conf/pbm.yaml"
 	restoreLayout = "2006-01-02T15:04:05"
 	resyncTimeout = 10 * time.Minute
+	pbmBusy       = "another operation in progress"
 	oplogSpanMin  = 10
 )
 
@@ -262,7 +263,7 @@ func (a archive) syncStorage(ctx context.Context, storage dtos.Storage) error {
 		return err
 	}
 	started := time.Now().Unix()
-	if _, err := a.locked(ctx, "config", "--force-resync"); err != nil {
+	if _, err := a.locked(ctx, "config", "--force-resync", "--wait"); err != nil {
 		return err
 	}
 
@@ -303,11 +304,21 @@ func (a archive) resynced(ctx context.Context, since int64) (bool, error) {
 }
 
 func (e Engine) locked(ctx context.Context, args ...string) (string, error) {
-	if err := family.Until(ctx, resyncTimeout, func() (bool, error) { return e.idle(ctx), nil }); err != nil {
-		return "", err
-	}
+	var output string
+	err := family.Until(ctx, resyncTimeout, func() (bool, error) {
+		if !e.idle(ctx) {
+			return false, nil
+		}
+		var err error
+		output, err = e.pbmCommand(ctx, args...)
+		if err != nil && strings.Contains(err.Error(), pbmBusy) {
+			return false, nil
+		}
 
-	return e.pbmCommand(ctx, args...)
+		return true, err
+	})
+
+	return output, err
 }
 
 func (e Engine) idle(ctx context.Context) bool {
