@@ -306,9 +306,6 @@ func (a archive) resynced(ctx context.Context, since int64) (bool, error) {
 func (e Engine) locked(ctx context.Context, args ...string) (string, error) {
 	var output string
 	err := family.Until(ctx, resyncTimeout, func() (bool, error) {
-		if !e.idle(ctx) {
-			return false, nil
-		}
 		var err error
 		output, err = e.pbmCommand(ctx, args...)
 		if err != nil && strings.Contains(err.Error(), pbmBusy) {

@@ -100,6 +100,8 @@ func TestStorageSyncWaitsForTheResyncPbmStartedItself(t *testing.T) {
 		switch strings.Join(args, " ") {
 		case "config --force-resync --wait":
 			if running > 0 {
+				running--
+
 				return "", errors.New("another operation in progress, Resync storage")
 			}
 		case "status --out=json":
@@ -142,7 +144,9 @@ func TestBackupWaitsForTheResyncPbmStartedItself(t *testing.T) {
 			return `{"running":{}}`, nil
 		case "backup":
 			if running > 0 {
-				return "", errors.New("unable to proceed with the backup, active lock is present")
+				running--
+
+				return "", errors.New("another operation in progress, Backup")
 			}
 			backedUp = true
 		}
@@ -175,6 +179,8 @@ func TestRestoreWaitsForTheResyncAConfigChangeStarted(t *testing.T) {
 			running = 2
 		case args[0] == "restore" || args[0] == "backup" || call == "config --force-resync --wait":
 			if running > 0 {
+				running--
+
 				return "", errors.New("another operation in progress, Resync storage")
 			}
 			restored = restored || args[0] == "restore"
@@ -204,6 +210,8 @@ func TestBackupWaitsForARunningResyncBeforeWritingTheConfig(t *testing.T) {
 			return `{"running":{}}`, nil
 		case "config":
 			if running > 0 {
+				running--
+
 				return "", errors.New("another operation in progress, Resync storage")
 			}
 			configured = true
@@ -254,6 +262,25 @@ func TestLockingCommandStopsOnOtherErrors(t *testing.T) {
 
 	if _, err := engine.locked(context.Background(), "backup"); err == nil || calls != 1 {
 		t.Fatalf("calls = %d, err = %v", calls, err)
+	}
+}
+
+func TestBackupWritesTheFirstConfigBeforePbmHasOne(t *testing.T) {
+	configured := false
+	engine := archivedEngine(t, func(_ context.Context, _ string, args ...string) (string, error) {
+		switch args[0] {
+		case "status":
+			return "", errors.New("get status of cluster: get cluster status: get config: get: mongo: no documents in result")
+		case "config":
+			configured = true
+		}
+
+		return "", nil
+	})
+	engine.anonymous = fakeAdmin{replies: map[string]bson.M{"hello": {"isWritablePrimary": true}}}
+
+	if err := engine.Archive().Backup(context.Background()); err != nil || !configured {
+		t.Fatalf("configured = %v, err = %v", configured, err)
 	}
 }
 
