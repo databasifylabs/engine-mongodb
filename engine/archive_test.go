@@ -19,7 +19,10 @@ import (
 )
 
 func TestPbmConfigFromStorage(t *testing.T) {
-	config := pbmConfigOf(dtos.Storage{Endpoint: "https://s3.local:9000", Region: "us-east-1", Bucket: "backups", Path: "mg1", AccessKey: "key", SecretKey: "secret", PathStyle: true})
+	config := pbmConfigOf(dtos.Storage{Endpoint: "https://s3.local:9000", Region: "us-east-1", Bucket: "backups", Path: "mg1", AccessKey: "key", SecretKey: "secret", PathStyle: true}, true)
+	if !strings.Contains(pbmConfigOf(dtos.Storage{Bucket: "backups"}, false), `"enabled": false`) {
+		t.Error("a config without slicing still turns point-in-time recovery on")
+	}
 
 	for _, fragment := range []string{`"bucket": "backups"`, `"prefix": "mg1"`, `"endpointUrl": "https://s3.local:9000"`, `"forcePathStyle": true`, `"insecureSkipTLSVerify": true`, `"access-key-id": "key"`, `"enabled": true`, `"oplogSpanMin": 10`, `"compression": "zstd"`} {
 		if !strings.Contains(config, fragment) {
@@ -73,18 +76,20 @@ func TestRestoreTurnsPitrOffThenOn(t *testing.T) {
 	want := []string{
 		"config --file " + engine.root.Path(pbmConfig),
 		"config --force-resync --wait",
-		"config --set pitr.enabled=false",
 		"restore --time=2026-11-09T10:30:00 --yes --wait",
 		"config --file " + engine.root.Path(pbmConfig),
 		"config --force-resync --wait",
-		"config --set pitr.enabled=true",
 		"backup --compression=zstd --wait",
+		"config --set pitr.enabled=true",
 	}
 	if strings.Join(calls, "\n") != strings.Join(want, "\n") {
 		t.Fatalf("pbm calls:\n%s", strings.Join(calls, "\n"))
 	}
-	if !strings.Contains(engine.root.Read(pbmConfig), `"bucket": "own"`) {
-		t.Fatalf("restore left the source storage configured:\n%s", engine.root.Read(pbmConfig))
+	if !strings.Contains(engine.root.Read(pbmConfig), `"bucket": "own"`) || !strings.Contains(engine.root.Read(pbmConfig), `"enabled": false`) {
+		t.Fatalf("restore left the wrong storage or slicing configured:\n%s", engine.root.Read(pbmConfig))
+	}
+	if engine.root.Exists(restoringMarker) {
+		t.Fatal("restore left its marker behind")
 	}
 	reclaimed, _ := bson.Marshal(bson.D{{Key: "sent", Value: sent}})
 	for _, want := range []string{`"root","pwd": "root-pw"`, `"createUser": "databasify_pbm","pwd": "agent"`} {
@@ -281,6 +286,25 @@ func TestBackupWritesTheFirstConfigBeforePbmHasOne(t *testing.T) {
 
 	if err := engine.Archive().Backup(context.Background()); err != nil || !configured {
 		t.Fatalf("configured = %v, err = %v", configured, err)
+	}
+}
+
+func TestStatusAndScheduledBackupLeavePbmAloneDuringARestore(t *testing.T) {
+	calls := []string{}
+	engine := archivedEngine(t, fakePbm(&calls))
+	engine.anonymous = fakeAdmin{replies: map[string]bson.M{"hello": {"isWritablePrimary": true}}}
+	engine.supervisor = servingSupervisor{calls: &[]string{}}
+	if _, err := engine.root.Write(restoringMarker, "", 0o600, false); err != nil {
+		t.Fatal(err)
+	}
+
+	_, _ = engine.Archive().Status(context.Background(), requests.ArchiveStatus{})
+	if err := engine.Archive().Backup(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	if len(calls) != 0 {
+		t.Fatalf("pbm ran during a restore: %v", calls)
 	}
 }
 

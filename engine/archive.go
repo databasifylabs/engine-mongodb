@@ -22,13 +22,14 @@ import (
 )
 
 const (
-	agentUnit     = "pbm-agent"
-	backupUnit    = "mongodb-backup"
-	pbmConfig     = "conf/pbm.yaml"
-	restoreLayout = "2006-01-02T15:04:05"
-	resyncTimeout = 10 * time.Minute
-	pbmBusy       = "another operation in progress"
-	oplogSpanMin  = 10
+	agentUnit       = "pbm-agent"
+	backupUnit      = "mongodb-backup"
+	pbmConfig       = "conf/pbm.yaml"
+	restoreLayout   = "2006-01-02T15:04:05"
+	resyncTimeout   = 10 * time.Minute
+	restoringMarker = "state/restoring"
+	pbmBusy         = "another operation in progress"
+	oplogSpanMin    = 10
 )
 
 type PbmRunner func(ctx context.Context, uri string, args ...string) (string, error)
@@ -50,7 +51,7 @@ func pbmURIOf(password string) string {
 	return "mongodb://" + credentials + "@127.0.0.1:" + strconv.Itoa(clientPort) + "/?authSource=admin&tls=true&tlsInsecure=true"
 }
 
-func pbmConfigOf(storage dtos.Storage) string {
+func pbmConfigOf(storage dtos.Storage, slicing bool) string {
 	config := map[string]any{
 		"storage": map[string]any{
 			"type": "s3",
@@ -60,7 +61,7 @@ func pbmConfigOf(storage dtos.Storage) string {
 				"credentials": map[string]string{"access-key-id": storage.AccessKey, "secret-access-key": storage.SecretKey},
 			},
 		},
-		"pitr":   map[string]any{"enabled": true, "oplogSpanMin": oplogSpanMin},
+		"pitr":   map[string]any{"enabled": slicing, "oplogSpanMin": oplogSpanMin},
 		"backup": map[string]any{"compression": "zstd"},
 	}
 	encoded, _ := json.MarshalIndent(config, "", "  ")
@@ -93,8 +94,8 @@ func (e Engine) pbmCommand(ctx context.Context, args ...string) (string, error) 
 	return e.pbm(ctx, uri, args...)
 }
 
-func (e Engine) usePbmStorage(ctx context.Context, storage dtos.Storage) error {
-	if _, err := e.root.Write(pbmConfig, pbmConfigOf(storage), 0o600, false); err != nil {
+func (e Engine) usePbmStorage(ctx context.Context, storage dtos.Storage, slicing bool) error {
+	if _, err := e.root.Write(pbmConfig, pbmConfigOf(storage, slicing), 0o600, false); err != nil {
 		return err
 	}
 	_, err := e.locked(ctx, "config", "--file", e.root.Path(pbmConfig))
@@ -110,10 +111,10 @@ func (e Engine) writable(ctx context.Context) bool {
 
 func (a archive) Backup(ctx context.Context) error {
 	request, err := a.saved()
-	if err != nil || request.Archive == nil || !a.writable(ctx) {
+	if err != nil || request.Archive == nil || a.restoring() || !a.writable(ctx) {
 		return err
 	}
-	if err := a.usePbmStorage(ctx, request.Archive.Storage); err != nil {
+	if err := a.usePbmStorage(ctx, request.Archive.Storage, true); err != nil {
 		return err
 	}
 	if _, err := a.locked(ctx, "backup", "--compression=zstd", "--wait"); err != nil {
@@ -200,8 +201,8 @@ func (a archive) Status(ctx context.Context, request requests.ArchiveStatus) (re
 	if saved.Archive == nil {
 		return responses.ArchiveStatus{}, contract.ErrUnsupported
 	}
-	if a.writable(ctx) {
-		if err := a.usePbmStorage(ctx, saved.Archive.Storage); err != nil {
+	if !a.restoring() && a.writable(ctx) {
+		if err := a.usePbmStorage(ctx, saved.Archive.Storage, true); err != nil {
 			return responses.ArchiveStatus{}, err
 		}
 	}
@@ -232,11 +233,12 @@ func (a archive) Restore(ctx context.Context, request requests.RestoreStart, rep
 	if saved.Archive == nil {
 		return command.Failure{Code: enums.ErrorCodeBusy, Message: "configure archive on this database before restoring into it"}
 	}
-	report("stopping oplog slicing")
-	if err := a.syncStorage(ctx, request.Storage); err != nil {
+	if _, err := a.root.Write(restoringMarker, "", 0o600, false); err != nil {
 		return err
 	}
-	if _, err := a.pbmCommand(ctx, "config", "--set", "pitr.enabled=false"); err != nil {
+	defer func() { _ = os.Remove(a.root.Path(restoringMarker)) }()
+	report("stopping oplog slicing")
+	if err := a.syncStorage(ctx, request.Storage); err != nil {
 		return err
 	}
 	report("restoring")
@@ -250,16 +252,20 @@ func (a archive) Restore(ctx context.Context, request requests.RestoreStart, rep
 	if err := a.syncStorage(ctx, saved.Archive.Storage); err != nil {
 		return err
 	}
-	if _, err := a.pbmCommand(ctx, "config", "--set", "pitr.enabled=true"); err != nil {
+	if _, err := a.locked(ctx, "backup", "--compression=zstd", "--wait"); err != nil {
 		return err
 	}
-	_, err = a.locked(ctx, "backup", "--compression=zstd", "--wait")
+	_, err = a.locked(ctx, "config", "--set", "pitr.enabled=true")
 
 	return err
 }
 
+func (a archive) restoring() bool {
+	return a.root.Exists(restoringMarker)
+}
+
 func (a archive) syncStorage(ctx context.Context, storage dtos.Storage) error {
-	if err := a.usePbmStorage(ctx, storage); err != nil {
+	if err := a.usePbmStorage(ctx, storage, false); err != nil {
 		return err
 	}
 	started := time.Now().Unix()
