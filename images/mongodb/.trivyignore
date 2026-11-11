@@ -1,0 +1,12 @@
+# js-yaml 3.13.1 bundled in the official mongo image (/opt/js-yaml) for its docker-entrypoint.sh, which these images never run.
+# Remove these lines once the official image ships a fixed js-yaml.
+CVE-2026-59869
+CVE-2026-84375
+GHSA-5p4m-2wfm-xmqj
+# go-jose v4.1.5 vendored in Percona Backup for MongoDB 2.17.0 (pbm, pbm-agent).
+# Remove this line once a PBM release vendors go-jose 4.1.6 or newer.
+CVE-2026-116587
+# apt and libapt-pkg in the base image, until the official image ships the fixed apt.
+CVE-2026-109518
+# golang.org/x/net v0.60.0 in Percona Backup for MongoDB 2.17.0 and v0.61.0 in the MongoDB Database Tools 100.20.0, until their releases take 0.62.0.
+CVE-2026-78661

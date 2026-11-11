@@ -1,0 +1,7 @@
+{
+  "processes": [
+    {"name": "prepare", "type": "oneshot", "enabled": true, "argv": ["install", "-d", "-o", "mongodb", "-g", "mongodb", "-m", "750", "/srv/mongodb/data"]},
+    {"name": "server", "enabled": true, "after": ["prepare"], "user": "mongodb", "restart": "always", "restartSec": "2s", "stopTimeout": "60s",
+     "argv": ["mongod", "--port", "57017", "--bind_ip", "127.0.0.1", "--dbpath", "/srv/mongodb/data", "--replSet", "smoke", "--quiet"]}
+  ]
+}

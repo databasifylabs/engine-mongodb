@@ -1,0 +1,17 @@
+name: images
+on:
+  push:
+    branches: ["**"]
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  images:
+    uses: databasifylabs/engine-sdk/.github/workflows/engine-images.yml@v0.2.0
+    with:
+      engine: mongodb
+      versions-file: versions.json

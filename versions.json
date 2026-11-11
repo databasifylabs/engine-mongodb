@@ -1,0 +1,83 @@
+{
+  "registry": "ghcr.io/databasifylabs",
+  "sdk": "0.2.0",
+  "go": {
+    "image": "golang",
+    "tag": "1.27.3-trixie",
+    "digest": "sha256:af1bfc2614ebb1dbd31af514b78740fd678850e76498762b425ecee4c5c6ea80"
+  },
+  "images": {
+    "mongodb-9.0": {
+      "engine": "mongodb",
+      "line": "9.0",
+      "release": "9.0.4",
+      "base": {
+        "image": "mongo",
+        "tag": "9.0.4",
+        "digest": "sha256:452bdaf2127b8ff851e31410a267809b9829eded219979f2210e7c7efb85a058"
+      },
+      "packages": {
+        "iproute2": "6.19.0-1ubuntu1.1",
+        "curl": "8.18.0-1ubuntu2.8"
+      },
+      "sources": {
+        "pbm": {
+          "version": "2.17.0",
+          "sha256": "4cc40bdcf0a1b491fc819d795818bc3140fa13d5dc938379bd2cb8f4dc55f795"
+        },
+        "pcsm": {
+          "version": "1.0.0",
+          "sha256": "f5db88a8b4072c8aa820b94948e886bc0847dbca23ebe49b6ddabadecb5b5365"
+        }
+      }
+    },
+    "mongodb-7.0": {
+      "engine": "mongodb",
+      "line": "7.0",
+      "release": "7.0.45",
+      "base": {
+        "image": "mongo",
+        "tag": "7.0.45",
+        "digest": "sha256:8bb4442761a63a8dda452744082cdac9644b429807eb977b42324a63cef59ca4"
+      },
+      "packages": {
+        "iproute2": "5.15.0-1ubuntu2.2",
+        "curl": "7.81.0-1ubuntu1.30"
+      },
+      "sources": {
+        "pbm": {
+          "version": "2.17.0",
+          "sha256": "4cc40bdcf0a1b491fc819d795818bc3140fa13d5dc938379bd2cb8f4dc55f795"
+        },
+        "pcsm": {
+          "version": "1.0.0",
+          "sha256": "f5db88a8b4072c8aa820b94948e886bc0847dbca23ebe49b6ddabadecb5b5365"
+        }
+      }
+    },
+    "mongodb-8.0": {
+      "engine": "mongodb",
+      "line": "8.0",
+      "release": "8.0.34",
+      "base": {
+        "image": "mongo",
+        "tag": "8.0.34",
+        "digest": "sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142"
+      },
+      "packages": {
+        "iproute2": "6.1.0-1ubuntu6.4",
+        "curl": "8.5.0-2ubuntu10.16"
+      },
+      "sources": {
+        "pbm": {
+          "version": "2.17.0",
+          "sha256": "4cc40bdcf0a1b491fc819d795818bc3140fa13d5dc938379bd2cb8f4dc55f795"
+        },
+        "pcsm": {
+          "version": "1.0.0",
+          "sha256": "f5db88a8b4072c8aa820b94948e886bc0847dbca23ebe49b6ddabadecb5b5365"
+        }
+      }
+    }
+  }
+}
