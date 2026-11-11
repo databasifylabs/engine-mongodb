@@ -190,6 +190,34 @@ func TestRestoreWaitsForTheResyncAConfigChangeStarted(t *testing.T) {
 	}
 }
 
+func TestBackupWaitsForARunningResyncBeforeWritingTheConfig(t *testing.T) {
+	running, configured := 2, false
+	engine := archivedEngine(t, func(_ context.Context, _ string, args ...string) (string, error) {
+		switch args[0] {
+		case "status":
+			if running > 0 {
+				running--
+
+				return `{"running":{"type":"resync"}}`, nil
+			}
+
+			return `{"running":{}}`, nil
+		case "config":
+			if running > 0 {
+				return "", errors.New("another operation in progress, Resync storage")
+			}
+			configured = true
+		}
+
+		return "", nil
+	})
+	engine.anonymous = fakeAdmin{replies: map[string]bson.M{"hello": {"isWritablePrimary": true}}}
+
+	if err := engine.Archive().Backup(context.Background()); err != nil || !configured {
+		t.Fatalf("configured = %v, err = %v", configured, err)
+	}
+}
+
 func TestResyncFailureStopsTheWait(t *testing.T) {
 	engine := archivedEngine(t, func(context.Context, string, ...string) (string, error) {
 		return `[{"ts":` + strconv.FormatInt(time.Now().Unix(), 10) + `,"s":1,"msg":"access denied"}]`, nil

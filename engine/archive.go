@@ -96,7 +96,7 @@ func (e Engine) usePbmStorage(ctx context.Context, storage dtos.Storage) error {
 	if _, err := e.root.Write(pbmConfig, pbmConfigOf(storage), 0o600, false); err != nil {
 		return err
 	}
-	_, err := e.pbmCommand(ctx, "config", "--file", e.root.Path(pbmConfig))
+	_, err := e.locked(ctx, "config", "--file", e.root.Path(pbmConfig))
 
 	return err
 }
@@ -302,16 +302,16 @@ func (a archive) resynced(ctx context.Context, since int64) (bool, error) {
 	return a.idle(ctx), nil
 }
 
-func (a archive) locked(ctx context.Context, args ...string) (string, error) {
-	if err := family.Until(ctx, resyncTimeout, func() (bool, error) { return a.idle(ctx), nil }); err != nil {
+func (e Engine) locked(ctx context.Context, args ...string) (string, error) {
+	if err := family.Until(ctx, resyncTimeout, func() (bool, error) { return e.idle(ctx), nil }); err != nil {
 		return "", err
 	}
 
-	return a.pbmCommand(ctx, args...)
+	return e.pbmCommand(ctx, args...)
 }
 
-func (a archive) idle(ctx context.Context) bool {
-	raw, err := a.pbmCommand(ctx, "status", "--out=json")
+func (e Engine) idle(ctx context.Context) bool {
+	raw, err := e.pbmCommand(ctx, "status", "--out=json")
 	var status pbmStatus
 
 	return err == nil && json.Unmarshal([]byte(raw), &status) == nil && status.Running.Type == ""
