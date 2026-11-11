@@ -269,7 +269,7 @@ func (a archive) syncStorage(ctx context.Context, storage dtos.Storage) error {
 		return err
 	}
 	started := time.Now().Unix()
-	if _, err := a.locked(ctx, "config", "--force-resync", "--wait"); err != nil {
+	if _, err := a.locked(ctx, "config", "--force-resync"); err != nil {
 		return err
 	}
 

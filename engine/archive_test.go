@@ -75,10 +75,10 @@ func TestRestoreTurnsPitrOffThenOn(t *testing.T) {
 
 	want := []string{
 		"config --file " + engine.root.Path(pbmConfig),
-		"config --force-resync --wait",
+		"config --force-resync",
 		"restore --time=2026-11-09T10:30:00 --yes --wait",
 		"config --file " + engine.root.Path(pbmConfig),
-		"config --force-resync --wait",
+		"config --force-resync",
 		"backup --compression=zstd --wait",
 		"config --set pitr.enabled=true",
 	}
@@ -103,7 +103,7 @@ func TestStorageSyncWaitsForTheResyncPbmStartedItself(t *testing.T) {
 	running := 0
 	engine := archivedEngine(t, func(_ context.Context, _ string, args ...string) (string, error) {
 		switch strings.Join(args, " ") {
-		case "config --force-resync --wait":
+		case "config --force-resync":
 			if running > 0 {
 				running--
 
@@ -182,7 +182,7 @@ func TestRestoreWaitsForTheResyncAConfigChangeStarted(t *testing.T) {
 			return `{"running":{}}`, nil
 		case strings.HasPrefix(call, "config --set"):
 			running = 2
-		case args[0] == "restore" || args[0] == "backup" || call == "config --force-resync --wait":
+		case args[0] == "restore" || args[0] == "backup" || call == "config --force-resync":
 			if running > 0 {
 				running--
 
