@@ -1,6 +1,6 @@
 {
   "registry": "ghcr.io/databasifylabs",
-  "sdk": "0.2.0",
+  "sdk": "0.2.2",
   "go": {
     "image": "golang",
     "tag": "1.27.3-trixie",
