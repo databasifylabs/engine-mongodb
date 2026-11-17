@@ -3,18 +3,18 @@
   "sdk": "1.0.0",
   "go": {
     "image": "golang",
-    "tag": "1.27.3-trixie",
-    "digest": "sha256:af1bfc2614ebb1dbd31af514b78740fd678850e76498762b425ecee4c5c6ea80"
+    "tag": "1.27.4-trixie",
+    "digest": "sha256:f18c3d73a184fb0582828510722e723b63a93f7188d11dd223d9be6f6880e65d"
   },
   "images": {
     "mongodb-9.0": {
       "engine": "mongodb",
       "line": "9.0",
-      "release": "9.0.4",
+      "release": "9.0.8",
       "base": {
         "image": "mongo",
-        "tag": "9.0.4",
-        "digest": "sha256:452bdaf2127b8ff851e31410a267809b9829eded219979f2210e7c7efb85a058"
+        "tag": "9.0.8",
+        "digest": "sha256:b0c835c26e5997413e985000f1013c275377cd9607761c1784d486f6dd620b7f"
       },
       "packages": {
         "iproute2": "6.19.0-1ubuntu1.1",
@@ -34,11 +34,11 @@
     "mongodb-7.0": {
       "engine": "mongodb",
       "line": "7.0",
-      "release": "7.0.45",
+      "release": "7.0.48",
       "base": {
         "image": "mongo",
-        "tag": "7.0.45",
-        "digest": "sha256:8bb4442761a63a8dda452744082cdac9644b429807eb977b42324a63cef59ca4"
+        "tag": "7.0.48",
+        "digest": "sha256:884c055bff8b7144ca44830d01826facd3083b33c4dea44b94a1476c62de3c32"
       },
       "packages": {
         "iproute2": "5.15.0-1ubuntu2.2",
@@ -58,11 +58,11 @@
     "mongodb-8.0": {
       "engine": "mongodb",
       "line": "8.0",
-      "release": "8.0.34",
+      "release": "8.0.38",
       "base": {
         "image": "mongo",
-        "tag": "8.0.34",
-        "digest": "sha256:b9924c330a8bbc5800fe9c69f04a84e221eca7b28fd049a0354147d9908fa142"
+        "tag": "8.0.38",
+        "digest": "sha256:bdc216e9d5a6ec2cfdac789b5832fdab64cd32055f59885cae918a92de63c361"
       },
       "packages": {
         "iproute2": "6.1.0-1ubuntu6.4",
