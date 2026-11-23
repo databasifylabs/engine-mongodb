@@ -38,7 +38,7 @@
       "base": {
         "image": "mongo",
         "tag": "7.0.48",
-        "digest": "sha256:884c055bff8b7144ca44830d01826facd3083b33c4dea44b94a1476c62de3c32"
+        "digest": "sha256:41e8195b2791692695e1dc9bd21cd51d0a3af05fff8ace9304a5c1acf94f1ae1"
       },
       "packages": {
         "iproute2": "5.15.0-1ubuntu2.2",
@@ -62,7 +62,7 @@
       "base": {
         "image": "mongo",
         "tag": "8.0.38",
-        "digest": "sha256:bdc216e9d5a6ec2cfdac789b5832fdab64cd32055f59885cae918a92de63c361"
+        "digest": "sha256:479e85ced54ffb8a40dade1dcde2da2a9ae858515b9415e9cc54bfb8f0575d01"
       },
       "packages": {
         "iproute2": "6.1.0-1ubuntu6.4",
